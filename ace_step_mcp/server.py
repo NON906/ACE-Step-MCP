@@ -2,8 +2,19 @@ from mcp.server.fastmcp import FastMCP
 import os
 import uuid
 import sys
+from typing import Optional
+from pydantic import BaseModel, Field
 
 from acestep.pipeline_ace_step import ACEStepPipeline
+
+
+# Response schemas
+class GenerateMusicResponse(BaseModel):
+    """Response schema for generate_music tool."""
+    result: str
+    output_path: Optional[str] = Field(default=None, description="Path to the generated audio file")
+    error: Optional[str] = Field(default=None, description="Error message if generation failed")
+
 
 # Initialize FastMCP
 mcp = FastMCP("ACE-Step-MCP")
@@ -37,8 +48,8 @@ def generate_music(
     prompt: str,
     lyrics: str = "[instrumental]",
     duration: float = 60.0,
-    output_path: str = None
-) -> str:
+    output_path: Optional[str] = None
+) -> GenerateMusicResponse:
     """
     Generate music using ACE Step.
 
@@ -49,14 +60,14 @@ def generate_music(
         output_path: Optional output file path. If not provided, a random UUID name will be used.
     
     Returns:
-        The absolute path to the generated audio file.
+        GenerateMusicResponse with success status and output_path or error.
     """
     if model_demo is None:
-        return "Error: Model failed to initialize. Check server logs."
+        return GenerateMusicResponse(result="error", error="Model failed to initialize. Check server logs.")
 
     # Determine output path
     if not output_path:
-        output_path = f"output_{uuid.uuid4().hex}.mp4"
+        output_path = f"output_{uuid.uuid4().hex}.mp3"
     
     # Handle relative paths
     if not os.path.isabs(output_path):
@@ -76,9 +87,9 @@ def generate_music(
             lyrics=lyrics,
             save_path=output_path
         )
-        return f"Success: Music generated at {output_path}"
+        return GenerateMusicResponse(result="success", output_path=output_path)
     except Exception as e:
-        return f"Error during generation: {str(e)}"
+        return GenerateMusicResponse(result="error", error=str(e))
 
 
 def main():
