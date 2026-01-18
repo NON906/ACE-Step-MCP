@@ -27,7 +27,7 @@ def main(prompt, lyrics, duration, output_path):
         overlapped_decode=overlapped_decode
     )
 
-    output_path = output_path or f"output_{uuid.uuid4().hex}.mp4"
+    output_path = output_path or f"output_{uuid.uuid4().hex}.mp3"
     if os.path.dirname(output_path) == "":
         output_path = "./" + output_path
 
