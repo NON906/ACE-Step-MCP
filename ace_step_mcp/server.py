@@ -1,5 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 import os
+import gc
 import uuid
 import sys
 from typing import Optional
@@ -25,22 +26,66 @@ dtype = os.getenv("TORCH_DTYPE", "bfloat16")
 torch_compile = bool(os.getenv("TORCH_COMPILE", ""))
 cpu_offload = bool(os.getenv("CPU_OFFLOAD", ""))
 overlapped_decode = bool(os.getenv("OVERLAPPED_DECODE", ""))
+unload_after_generate = bool(os.getenv("UNLOAD_AFTER_GENERATE", ""))
 
-print(f"Loading ACEStepPipeline with checkpoint={checkpoint_path}, dtype={dtype}...", file=sys.stderr)
+# Global pipeline instance (lazy loaded)
+_pipeline_instance: Optional[ACEStepPipeline] = None
 
-# Initialize the pipeline globally
-try:
-    model_demo = ACEStepPipeline(
-        checkpoint_dir=checkpoint_path,
-        dtype=dtype,
-        torch_compile=torch_compile,
-        cpu_offload=cpu_offload,
-        overlapped_decode=overlapped_decode
-    )
-    print("ACEStepPipeline loaded successfully.", file=sys.stderr)
-except Exception as e:
-    print(f"Failed to load ACEStepPipeline: {e}", file=sys.stderr)
-    model_demo = None
+
+def _load_pipeline() -> Optional[ACEStepPipeline]:
+    """Load the ACEStepPipeline if not already loaded."""
+    global _pipeline_instance
+    if _pipeline_instance is not None:
+        return _pipeline_instance
+    
+    print(f"Loading ACEStepPipeline with checkpoint={checkpoint_path}, dtype={dtype}...", file=sys.stderr)
+    try:
+        _pipeline_instance = ACEStepPipeline(
+            checkpoint_dir=checkpoint_path,
+            dtype=dtype,
+            torch_compile=torch_compile,
+            cpu_offload=cpu_offload,
+            overlapped_decode=overlapped_decode
+        )
+        print("ACEStepPipeline loaded successfully.", file=sys.stderr)
+        return _pipeline_instance
+    except Exception as e:
+        print(f"Failed to load ACEStepPipeline: {e}", file=sys.stderr)
+        return None
+
+
+def _unload_pipeline() -> None:
+    """Unload the ACEStepPipeline to free memory."""
+    global _pipeline_instance
+    if _pipeline_instance is not None:
+        print("Unloading ACEStepPipeline...", file=sys.stderr)
+        
+        try:
+            if hasattr(_pipeline_instance, "ace_step_transformer"):
+                del _pipeline_instance.ace_step_transformer
+            
+            if hasattr(_pipeline_instance, "music_dcae"):
+                del _pipeline_instance.music_dcae
+                
+            if hasattr(_pipeline_instance, "text_encoder_model"):
+                del _pipeline_instance.text_encoder_model
+        except Exception as e:
+            print(f"Error during model offloading: {e}", file=sys.stderr)
+
+        del _pipeline_instance
+        _pipeline_instance = None
+        
+        gc.collect()
+        # Try to clear CUDA cache if available
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+                print("CUDA cache cleared.", file=sys.stderr)
+        except ImportError:
+            pass
+        print("ACEStepPipeline unloaded.", file=sys.stderr)
 
 
 @mcp.tool()
@@ -62,6 +107,8 @@ def generate_music(
     Returns:
         GenerateMusicResponse with success status and output_path or error.
     """
+    # Lazy load the pipeline
+    model_demo = _load_pipeline()
     if model_demo is None:
         return GenerateMusicResponse(result="error", error="Model failed to initialize. Check server logs.")
 
@@ -87,9 +134,15 @@ def generate_music(
             lyrics=lyrics,
             save_path=output_path
         )
-        return GenerateMusicResponse(result="success", output_path=output_path)
+        result = GenerateMusicResponse(result="success", output_path=output_path)
     except Exception as e:
-        return GenerateMusicResponse(result="error", error=str(e))
+        result = GenerateMusicResponse(result="error", error=str(e))
+    
+    # Unload pipeline after generation if configured
+    if unload_after_generate:
+        _unload_pipeline()
+    
+    return result
 
 
 def main():
