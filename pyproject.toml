@@ -1,16 +1,20 @@
 [project]
 name = "ace-step-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP Server for ACE Step Music Generation"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "ace-step",
+    "mcp",
     "torch>=2.9.1",
     "torchaudio>=2.9.1",
     "torchcodec>=0.9.1",
     "torchvision>=0.24.1",
 ]
+
+[project.scripts]
+ace-step-mcp = "ace_step_mcp.server:main"
 
 [tool.uv.sources]
 torch = [
@@ -28,3 +32,7 @@ ace-step = { git = "https://github.com/ace-step/ACE-Step.git" }
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
