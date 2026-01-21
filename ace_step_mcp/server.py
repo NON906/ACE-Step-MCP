@@ -149,5 +149,9 @@ def main():
     mcp.run()
 
 
+def download_model():
+    _load_pipeline()
+
+
 if __name__ == "__main__":
     main()

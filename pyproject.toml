@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 ace-step-mcp = "ace_step_mcp.server:main"
+ace-step-mcp-download = "ace_step_mcp.server:download_model"
 
 [tool.uv.sources]
 torch = [
