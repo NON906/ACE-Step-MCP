@@ -46,7 +46,7 @@ Claude Desktop で使用するには、`claude_desktop_config.json` に以下の
 {
   "mcpServers": {
     "ace-step": {
-      "command": "uvx",
+      "command": "uv",
       "args": [
         "--directory",
         "/path/to/ACE-Step-MCP",

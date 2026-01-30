@@ -48,7 +48,7 @@ To use this with Claude Desktop, add the following configuration to your `claude
 {
   "mcpServers": {
     "ace-step": {
-      "command": "uvx",
+      "command": "uv",
       "args": [
         "--directory",
         "/path/to/ACE-Step-MCP",
